@@ -1,0 +1,108 @@
+# Lab Assignment 02 - Textual Content Moderation Using Cognitive Services and Python!
+
+In this lab assignment, we will be using one of the **Microsoft Azure Cognitive Services** to build a system that can automatically detect inappropriate content such as profanity, hate speech, threats, racism, etc. in written text. Recall that **cognitive computing** involves using artificial intelligence technologies to build systems to perform tasks that could previously only be accomplished by the human mind. The detection of inappropriate content in written text is an excellent example of such a task, and as such we will building a **cognitive computing system** in this lab assignment.
+
+By the time you have completed this lab, you will have achieved all of the following learning objectives:
+
+## Learning Objectives
+
+1. Understand what Azure Cognitive Services are.
+2. Have the ability to configure and provision cognitive services as resources on the Microsoft Azure platform.
+3. Understand the purpose of an application programming interface (API).
+4. Use Python to connect to and interact with the Content Moderator cognitive service via its API.
+5. Have the ability to iteratively send written comments to the Content Moderator cognitive service and process the results to determine if the written comments are inappropriate or obscene.
+6. Analyze the results obtained from the Content Moderator cognitive service and compare the performance of those results to labels assigned by human judges.
+7. Continue to develop skills working with and analyzing data in Python.
+
+## About Azure Cognitive Services
+
+According to Microsoft:
+
+> "Cognitive Services bring AI within reach of every developer... All it takes is an API call to embed the ability to see, hear, speak, search, understand, and accelerate decision-making into your apps."
+
+Microsoft currently has **nearly 30 cognitive service APIs** available that can perform a wide variety of tasks. We will be using several of these APIs in our remaining lab assignments.
+
+You may learn more about Azure Cognitive Services [on this website](https://azure.microsoft.com/en-us/services/cognitive-services).
+
+## About the Content Moderator Cognitive Service
+
+According to Microsoft:
+
+> "Azure Content Moderator is a cognitive service that checks text, image, and video content for material that is potentially offensive, risky, or otherwise undesirable. When this material is found, the service applies appropriate labels (flags) to the content. Your app can then handle flagged content in order to comply with regulations or maintain the intended environment for users."
+
+The Content Moderator service is hence intended to provide developers with an all-in-one solution to content moderation tasks. If you consider the Web in its entirety, you will notice that a great deal of content is **user generated**. For example, virtually all of the content on websites such as Twitter, Facebook, Instagram, YouTube, Stack Overflow, Wikipedia, etc. is created by users, and not by the companies that operate those websites. In order to provide a positive experience for as many users as possible, companies are highly interested in ensuring that potentially offensive content is not contained in the videos, images, or written text that users post on the companies' websites. The purpose of the Content Moderator service, then, is to provide a single API that can be used to detect inappropriate content in text, images, or video. We will be using only the text moderation part of the API in this lab assignment, but I wanted you to be aware of the API's image and video moderation services, as well.
+
+You may learn more about the Content Moderator service [on this website](https://azure.microsoft.com/en-us/services/cognitive-services/content-moderator).
+
+## About APIs
+
+An API (Application Programming Interface) is a software interface that allows the resources, capabilities, or services of one computer system to be used by other computer systems. As with functions in computer programs, using an API typically involves passing one or more inputs to the system that provides the API, which then returns one or more outputs back to the system that called the API.
+
+To learn more about APIs, please read [this article](https://en.wikipedia.org/wiki/Application_programming_interface).
+
+## Lab Prerequisites
+
+To complete this lab, you will need to complete the following tasks:
+
+*   Create or sign into a Microsoft Azure account. If you do not already have an Azure account, then please sign up for a free student account [on this website](https://azure.microsoft.com/en-us/free/students).
+*   Add the "Content Moderator" resource to your Azure account. To do this, follow these steps:
+
+  1. After signing into your Azure account, click on the "Create a Resource" button.
+  2. Type "Content Moderator" in the search box, and click on the "Content Moderator" result when it appears.
+  3. Click the "Create" button.
+  4. Choose or create a resource group for the Content Moderator resource (e.g., "585").
+  5. Be sure that your "Azure for Students" subscription is selected, and that you have chosen a location for the resource (e.g., "West US 2").
+  6. Provide a unique name for the resource. I used "585-Content-Moderator", but feel free to use whatever name you like.
+  7. Choose the "F0" (free) pricing tier. This tier allows one call to the API per second, with a maximum of 5,000 calls per month.
+  8. Click the "Review + create" button and then click the "Create" button. 
+  9. Wait for your new resource to be deployed (this may take a minute or two).
+  10. Go to your new Content Moderator resource.
+  11. **Copy and paste your key and endpoint URL into the code cell below**. You will need these values in order to be able to make calls to the API from your Python code.
+  12. Be sure to run the code cell below before continuing with the lab assignment.
+
+
+#copy and paste your Content Moderator API key and endpoint URL from Azure into the variables below:
+api_key = '93de9d8d881740b5bf3d75de21d46a77'
+endpoint = 'https://contentmoderator-python.cognitiveservices.azure.com/'
+
+# Install Azure Content Moderator and Import Libraries
+The Azure Content Moderator is not installed by default in the Google Colab environment, so we'll need to install it. As usual, we'll also need to import all of the libraries that we'll use in the lab assignment.
+Run the code cell below to install the content moderator and import all of the necessay libraries.
+
+#install the Microsoft Azure Cognitive Services Content Moderator library
+!pip install azure-cognitiveservices-vision-contentmoderator
+
+#import libraries
+import azure.cognitiveservices.vision.contentmoderator.models
+import io
+import numpy as np
+import pandas as pd
+import time
+from azure.cognitiveservices.vision.contentmoderator import ContentModeratorClient
+from IPython.display import clear_output
+from msrest.authentication import CognitiveServicesCredentials
+
+## Load Data
+
+The data for this lab assignment are real user comments from Wikipedia's "talk" pages. Each comment has been evaluated by human judges to determine whether it contains different types of potentially inappropriate content such as threats, obscenity, insults, or identity-based hate.
+
+### Dataset Variables
+
+The dataset contains the following variables:
+* <u>comment_text</u>: The actual written user comment from a Wikipedia "talk" page
+* <u>toxic</u>: Whether or not the comment is considered to be toxic (1 = toxic, 0 = not toxic)
+* <u>obscene</u>: Whether or not the comment is considered obscene (1 = obscene, 0 = not obscene)
+* <u>threat</u>: Whether or not the comment is considered to contain a threat (1 = contains a threat, 0 = does not contain a threat)
+* <u>insult</u>: Whether or not the comment is considered to contain an insult (1 = contains an insult, 0 = does not contain an insult)
+* <u>identity_hate</u>: Whether or not the comment is considered to involve identity-based hate (1 = involves identity-based hate, 0 = does not involve identity-based hate)
+
+Run the code cell below to load the data into a pandas dataframe, and preview the first few rows of data.
+**<u>WARNING</u>: Many of the written comments in the dataset are obscene, offensive, or otherwise inappropriate!** It is unfortunately necessary for us to work with such comments if we want to build a system that can detect them. Remember that the overall goal of automated content moderation is to provide companies with tools that they can use to *prevent* offensive user-generated content from appearing on their websites. I would therefore ask you to maintain the proper perspective as we work with these data by adopting the scientific principles of rationality and objectivity.
+
+#load the dataset into a pandas dataframe named "df"
+df = pd.read_csv('Lab Assignment 02 - Data.csv')
+
+#show the first few rows of data
+df.head(10)
+
+
